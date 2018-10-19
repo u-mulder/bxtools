@@ -1,2 +1,2 @@
 # bxtools
-Some bxtools to simplify development
+Some tools to simplify bitrix development.
