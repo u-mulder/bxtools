@@ -1,6 +1,6 @@
 <?php
 
-namespace Um\Facade;
+namespace Um\BxTools;
 
 class IBEAccessor
 {
@@ -34,6 +34,15 @@ class IBEAccessor
 
 
         return 'zzz';
+    }
+    
+    public function prepareArguments($arguments)
+    {
+        $this->sort = $arguments[0];
+        $this->filter = $arguments[1];// also with knowing the entity
+        $this->group = $arguments[2];
+        $this->navParams = $arguments[3];
+        $this->select = $arguments[4];
     }
 
     /*protected function getSort(): array

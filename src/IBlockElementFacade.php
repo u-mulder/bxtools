@@ -1,17 +1,25 @@
 <?php
 
-namespace Um\Facade;
+namespace Um\BxTools;
 
-class IBlockElementFacade
+class IBEFacade
 {
 
     const METHOD_PREFIX = 'get';
     const COUNT_SUFFIX = 'Count';
     const ACTIVE_SUFFIX = 'Active';
     const COUNT_ACTIVE_SUFFIX = 'CountActive';
+    const REPLACE_PATTERN = '/[A-Z]/';
 
     /** @var IBEAccessor[] */
-    protected $accessors;
+    protected static $accessors;
+    
+    /** @var IBEAccessor */
+    protected static $accessor;
+
+    protected function __construct() {}
+    protected function __sleep() {}
+    protected function __wakeup() {}
 
     /**
      * Возможные названия методов:
@@ -26,27 +34,46 @@ class IBlockElementFacade
      */
     public static function __callStatic($method, $arguments)
     {
-        $accessorAlias = self::getAccessorAliases($method);
-        self::resolveAccessor($accessorAlias);
-        self::prepareAccessorArguments($arguments);
+        if (!self::isAllowedMethodName()) {
+            throw new \RuntimeException(sprintf(
+                'Method name "%s" is not allowed',
+                $method
+            ));
+        }
+        
+        $accessorAliases = self::getAccessorAliases($method);
+        $alias = self::getAccessorAlias($accessorAliases);
 
-        //return $this->accessor->getList();
+        return self::$accessors[$alias]
+            ->prepareArguments()    // TODO
+            ->getList();            // TODO
+    }
+    
+    // TODO - phpdoc
+    protected static function isAllowedMethodName(string $name): bool
+    {
+        return \strlen(static::METHOD_PREFIX) < \strlen($name) 
+            && strpos($name, static::METHOD_PREFIX) === 0;
     }
 
+    // threeVariants:   PopularArticles:
+    // 0, populararticles
+    // 1. popular_articles
+    // 2. popular-articles
     public function getAccessorAliases(): array
     {
-        $entity = substr($method, \strlen(static::METHOD_PREFIX));
-        // Articles
-        $entity = \strtolower($entity);
+        $aliases = [];
 
-        // threeVariants:   PopularArticles:
-        // 0, populararticles
-        // 1. popular_articles
-        // 2. popular-articles
+        $alias = \substr($method, \strlen(static::METHOD_PREFIX));
+        $alias_lower = \strtolower($alias);
+        $aliases[$alias_lower] = 1;
 
+        if ($alias !== $alias_lower) {
+            $aliases[self::toSnakeCase($alias)] = 1;
+            $aliases[self::toKebabCase($alias)] = 1;
+        }
 
-
-        return [];
+        return array_keys($aliases);
     }
 
     /**
@@ -62,24 +89,67 @@ class IBlockElementFacade
         $this->accessors[$alias] = new IBEAccessor($iblock_id);
     }
 
-    public function resolveAccessor()
+    public function getAccessorAlias($possibleAliases)
     {
-        if (!isset($this->entities[$entity])) {
-            // find iblock by $entity (is it code or ID)?
-            // for which site ID is this?
+        $alias = '';
+
+        foreach ($possibleAliases as $value) {
+            if (!empty(self::$accessors[$value])) {
+                $alias = $value;
+                break;
+            }
+        }
+        
+        if (!$alias) {
+            $alias = self::resolveAccessorFromAliases($possibleAliases);
         }
 
-        $this->entities[$entity] = [
-            'IBLOCK_ID' => 42,
-        ];
+        return $alias;
+    }
+    
+    
+    protected static function resolveAccessorFromAliases($possibleAliases)
+    {
+        foreach ($possibleAliases as $alias) {
+            $iblock = \Bitrix\Main\IblockTable::getList([
+                'filter' => [
+                    '=CODE' => $alias
+                ],
+                'select' => ['ID', 'NAME']
+            ])->fetch();
+            if ($iblock) {
+                self::registerAccessor($alias, $iblock['ID']);
+                return $alias;
+            }
+        }
+        
+        throw new \RuntimeException(sprintf(
+            'No iblock found for aliases %s',
+            implode(', ', $possibleAliases)
+        ));
     }
 
-    public function prepareArguments($arguments)
+    // TODO - test
+    protected static function toKebabCase(string $source): string
     {
-        $this->sort = $arguments[0];
-        $this->filter = $arguments[1];// also with knowing the entity
-        $this->group = $arguments[2];
-        $this->navParams = $arguments[3];
-        $this->select = $arguments[4];
+        preg_replace_callback(
+            static::REPLACE_PATTERN,
+            function ($m) {
+                return '-' . strtolower($m[0]);
+            },
+            $source
+        );
+    }
+
+    // TODO - test
+    protected static function toSnakeCase(string $source): string
+    {
+        preg_replace_callback(
+            static::REPLACE_PATTERN,
+            function ($m) {
+                return '_' . strtolower($m[0]);
+            },
+            $source
+        );
     }
 }
