@@ -12,10 +12,10 @@ class IBEFacade
     const REPLACE_PATTERN = '/[A-Z]/';
 
     /** @var IBEAccessor[] */
-    protected static $accessors;
+    protected static $accessors = [];
     
-    /** @var IBEAccessor */
-    protected static $accessor;
+    /** */
+    protected static $iblock_finder;
 
     protected function __construct() {}
     protected function __sleep() {}
@@ -41,14 +41,14 @@ class IBEFacade
             ));
         }
         
-        $accessorAliases = self::getAccessorAliases($method);
-        $alias = self::getAccessorAlias($accessorAliases);
+        $accessorAliases = self::$instance->getAccessorAliases($method);
+        $alias = self::$instance->getAccessorAlias($accessorAliases);
 
         return self::$accessors[$alias]
-            ->prepareArguments()    // TODO
-            ->getList();            // TODO
+            ->prepareArguments($arguments)
+            ->getList();
     }
-    
+
     // TODO - phpdoc
     protected static function isAllowedMethodName(string $name): bool
     {
@@ -56,7 +56,8 @@ class IBEFacade
             && strpos($name, static::METHOD_PREFIX) === 0;
     }
 
-    // threeVariants:   PopularArticles:
+    // TODO - phpdoc
+    // threeVariants: PopularArticles:
     // 0, populararticles
     // 1. popular_articles
     // 2. popular-articles
@@ -65,6 +66,8 @@ class IBEFacade
         $aliases = [];
 
         $alias = \substr($method, \strlen(static::METHOD_PREFIX));
+        $alias = \strtolower($alias[0]) . \substr($alias, 1);
+
         $alias_lower = \strtolower($alias);
         $aliases[$alias_lower] = 1;
 
@@ -76,26 +79,14 @@ class IBEFacade
         return array_keys($aliases);
     }
 
-    /**
-     * Create new accessor with provided `$alias`.
-     * Iblock existence with provided `$iblock_id` is NOT checked.
-     * // TODO - add argument `bool $check_existence` and check whether iblock with such id exists (SITE_ID which?)
-     *
-     * @param $alias
-     * @param $iblock_id
-     */
-    public function registerAccessor(string $alias, int $iblock_id): void
-    {
-        $this->accessors[$alias] = new IBEAccessor($iblock_id);
-    }
-
-    public function getAccessorAlias($possibleAliases)
+    // TODO phpdoc tests
+    public function getAccessorAlias(array $possibleAliases): string
     {
         $alias = '';
 
-        foreach ($possibleAliases as $value) {
-            if (!empty(self::$accessors[$value])) {
-                $alias = $value;
+        foreach ($possibleAliases as $possibleAlias) {
+            if (!empty(self::$accessors[$possibleAlias])) {
+                $alias = $possibleAlias;
                 break;
             }
         }
@@ -106,17 +97,29 @@ class IBEFacade
 
         return $alias;
     }
-    
-    
+
+    /**
+     * Create new accessor with provided `$alias`.
+     * Iblock existence with provided `$iblock_id` is NOT checked.
+     * // TODO - add argument `bool $check_existence` and check whether iblock with such id exists (SITE_ID which?)
+     *
+     * @param $alias
+     * @param $iblock_id
+     */
+    public static function registerAccessor(string $alias, int $iblock_id): void
+    {
+        $this->accessors[$alias] = new IBEAccessor($iblock_id);
+    }
+
+    // TODO test
     protected static function resolveAccessorFromAliases($possibleAliases)
     {
+        if (!self::$iblock_finder) {
+            self::$iblock_finder = new IBlockFinder();
+        }
+        
         foreach ($possibleAliases as $alias) {
-            $iblock = \Bitrix\Main\IblockTable::getList([
-                'filter' => [
-                    '=CODE' => $alias
-                ],
-                'select' => ['ID', 'NAME']
-            ])->fetch();
+            $iblock = self::$iblock_finder->findByCode($alias);
             if ($iblock) {
                 self::registerAccessor($alias, $iblock['ID']);
                 return $alias;
