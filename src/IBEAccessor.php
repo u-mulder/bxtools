@@ -21,18 +21,28 @@ class IBEAccessor
      * Подготавливаем аргументы для передачи в `getList`
      *
      * @param $arguments
-     * @return $this
+     * @param $modfifiers
+     * @return IBEAccessor
      */
-    public function prepareArguments($arguments): self
+    public function prepareArguments(array $arguments, array $modifiers): self
     {
+        // Modificators (active, count)
+
         $this->sort = \is_array($arguments[0]) ? $arguments[0] : [];
 
         $this->filter = \array_merge(
             ['IBLOCK_ID' => $this->iblock_id],
             $arguments[1]
         );
+        /*if (!empty($modifiers['ACTIVE'])) {
+            $this->filter['ACTIVE'] = 'Y';
+        }*/
 
-        $this->grouping = \is_array($arguments[2]) ? $arguments[2] : false;
+        if (!empty($modifiers['COUNT'])) {
+            $this->grouping = [];
+        } else {
+            $this->grouping = \is_array($arguments[2]) ? $arguments[2] : false;
+        }
 
         $this->navParams = \is_array($arguments[3]) ? $arguments[3] : false;
 

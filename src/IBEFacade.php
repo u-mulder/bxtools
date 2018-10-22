@@ -49,11 +49,13 @@ class IBEFacade
             ));
         }
 
+        $modifiers = self::extractModifiers($method);
+
         $accessorAliases = self::getAccessorAliases($method);
         $alias = self::getExistingAlias($accessorAliases);
 
         return self::$accessors[$alias]
-            ->prepareArguments($arguments)
+            ->prepareArguments($arguments, $modifiers)
             ->getList();
     }
 
@@ -68,9 +70,17 @@ class IBEFacade
      */
     protected static function isAllowedMethodName(string $method_name): bool
     {
+        // TODO 2 - нет модификаторов active/count/countactive!
         return \strlen(static::METHOD_PREFIX) < \strlen($method_name)
             && strpos($method_name, static::METHOD_PREFIX) === 0;
     }
+
+    protected function extractModifiers(string $method_name)
+    {
+        // TODO
+
+    }
+
 
     /**
      * Получаем набор возможных алиасов, по которым можно найти аксессор.
