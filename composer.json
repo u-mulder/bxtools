@@ -1,0 +1,11 @@
+{
+    "name": "u_mulder/bxtools",
+    "description": "Tools to simplify bitrix dev",
+    "type": "library",
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Um\\BxTools\\": "src/"
+        }
+    }
+}
