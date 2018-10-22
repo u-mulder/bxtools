@@ -18,11 +18,35 @@ class IBEAccessor
     }
 
     /**
-     * Function that performs selecting required data from iblock
+     * Подготавливаем аргументы для передачи в `getList`
+     *
+     * @param $arguments
+     * @return $this
+     */
+    public function prepareArguments($arguments): self
+    {
+        $this->sort = \is_array($arguments[0]) ? $arguments[0] : [];
+
+        $this->filter = \array_merge(
+            ['IBLOCK_ID' => $this->iblock_id],
+            $arguments[1]
+        );
+
+        $this->grouping = \is_array($arguments[2]) ? $arguments[2] : false;
+
+        $this->navParams = \is_array($arguments[3]) ? $arguments[3] : false;
+
+        $this->selectFields = \is_array($arguments[4]) ? $arguments[4] : [];
+
+        return $this;
+    }
+
+    /**
+     * Родными методами битрикса возвращаем нужные данные
      *
      * @return mixed
      */
-    protected function getList()
+    public function getList()
     {
         return \CIBlockElement::GetList(
             $this->sort,
@@ -31,21 +55,5 @@ class IBEAccessor
             $this->navParams,
             $this->selectFields
         );
-    }
-    
-    public function prepareArguments($arguments)
-    {
-        $this->sort = is_array($arguments[0]) ? $arguments[0] : [];
-        
-        $this->filter = array_merge(
-            ['IBLOCK_ID' => $this->iblock_id],
-            $arguments[1]
-        );
-
-        $this->group = is_array($arguments[2]) ? $arguments[2] : false;
-
-        $this->navParams = is_array($arguments[3]) ? $arguments[3] : false;
-
-        $this->select = $arguments[4];
     }
 }
