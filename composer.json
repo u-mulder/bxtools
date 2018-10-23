@@ -2,6 +2,7 @@
     "name": "u_mulder/bxtools",
     "description": "Tools to simplify bitrix dev",
     "type": "library",
+    "stability": "dev",
     "require": {},
     "autoload": {
         "psr-4": {
