@@ -1,9 +1,19 @@
 {
     "name": "u_mulder/bxtools",
     "description": "Tools to simplify bitrix dev",
+    "license": "MIT",
     "type": "library",
-    "stability": "dev",
-    "require": {},
+    "minimum-stability": "dev",
+    "require": {
+        "php" : "^7.0"
+    },
+    "authors": [
+        {
+            "name": "u_mulder",
+            "email": "m264695502@gmail.com",
+            "role": "Developer"
+        }
+    ],
     "autoload": {
         "psr-4": {
             "Um\\BxTools\\": "src/"
