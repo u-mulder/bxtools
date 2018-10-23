@@ -6,9 +6,8 @@ class IBEFacade
 {
 
     const METHOD_PREFIX = 'get';
-    const COUNT_SUFFIX = 'Count';
-    const ACTIVE_SUFFIX = 'Active';
-    const COUNT_ACTIVE_SUFFIX = 'CountActive';
+    const ACTIVE_PREFIX = 'active';
+    const COUNT_SUFFIX = 'count';
     const REPLACE_PATTERN = '/[A-Z]/';
 
     /** @var IBEAccessor[] */
@@ -29,58 +28,101 @@ class IBEFacade
      *
      * Возможные названия методов:
      *  - `get%ENTITY_NAME%` (например, `getArticles`) - получить элементы из сущности `ENTITY_NAME`
-     *  - `get%ENTITY_NAME%Active` (например, `getArticlesActive`) - получить АКТИВНЫЕ элементы из сущности `ENTITY_NAME`
+     *  - `getActive%ENTITY_NAME%` (например, `getActiveArticles`) - получить АКТИВНЫЕ элементы из сущности `ENTITY_NAME`
      *  - `get%ENTITY_NAME%Count` (например, `getArticlesCount`) - получить число элементов сущности `ENTITY_NAME`
-     *  - `get%ENTITY_NAME%CountActive` (например, `getArticlesCountActive`) - получить число АКТИВНЫХ элементов сущности `ENTITY_NAME`
+     *  - `getActive%ENTITY_NAME%Count` (например, `getActiveArticlesCount`) - получить число АКТИВНЫХ элементов сущности `ENTITY_NAME`
+     *
+     * Так как названия методов нечувствительны к регистру,
+     * то `getarticles` или `getactivearticles` также
+     * являются обрабатываемыми названиями методов.
+     * Однако, при таком вызове метода, парсер лишен возможности
+     * использовать `camel_case` и `kebab-case` названия сущности.
      *
      * @param $method
      * @param $arguments
      *
      * @return mixed
-     *
-     * @throws \UnexpectedValueException
      */
     public static function __callStatic($method, $arguments)
     {
-        if (!self::isAllowedMethodName($method)) {
-            throw new \UnexpectedValueException(sprintf(
-                'Method name "%s" is not allowed',
-                $method
-            ));
-        }
+        $methodData = self::parseMethodName($method);
 
-        $modifiers = self::extractModifiers($method);
-
-        $accessorAliases = self::getAccessorAliases($method);
+        $accessorAliases = self::getAccessorAliases($methodData['alias']);
         $alias = self::getExistingAlias($accessorAliases);
 
         return self::$accessors[$alias]
-            ->prepareArguments($arguments, $modifiers)
+            ->prepareArguments($arguments, $methodData['modifiers'])
             ->getList();
     }
 
     /**
-     * Проверяем что название метода содержит в
-     * начале  названия строку `METHOD_PREFIX`
-     * и после `METHOD_PREFIX` есть еще символы.
+     * Парсим название метода, получаем алиас сущности и дополнительные модификаторы
      *
-     * @param string $method_name
+     * @param string $methodName
+     * @return array
+     * @internal param string $method_name
      *
-     * @return bool
+     * @throws \UnexpectedValueException
      */
-    protected static function isAllowedMethodName(string $method_name): bool
+    protected static function parseMethodName(string $methodName): array
     {
-        // TODO 2 - нет модификаторов active/count/countactive!
-        return \strlen(static::METHOD_PREFIX) < \strlen($method_name)
-            && strpos($method_name, static::METHOD_PREFIX) === 0;
+        $result = [
+            'alias' => '',
+            'modifiers' => [],
+        ];
+
+        $originalMethodName = $methodName;
+
+        $methodPrefixLen = \strlen(static::METHOD_PREFIX);
+        if (\strlen($methodName) <= $methodPrefixLen) {
+            throw new \UnexpectedValueException(sprintf(
+                'Method name "%s" is too short',
+                $methodName
+            ));
+        }
+
+        if (strpos($methodName, static::METHOD_PREFIX) !== 0) {
+            throw new \UnexpectedValueException(sprintf(
+                'Method name should be prefixed with "%s", currently "%s"',
+                static::METHOD_PREFIX,
+                $methodName
+            ));
+        }
+
+        $methodName = \substr($methodName, $methodPrefixLen);
+
+        $prefixLen = \strlen(static::ACTIVE_PREFIX);
+        if (0 === stripos($methodName, static::ACTIVE_PREFIX)) {
+            $methodName = \substr($methodName, $prefixLen);
+            $result['modifiers'][static::ACTIVE_PREFIX] = 1;
+        }
+
+        if (!$methodName) {
+            throw new \UnexpectedValueException(sprintf(
+                'Method name "%s" becomes empty after removing "%s" prefix',
+                $originalMethodName,
+                static::ACTIVE_PREFIX
+            ));
+        }
+
+        $suffixLen = \strlen(static::COUNT_SUFFIX);
+        if (\strtolower(\substr($methodName, -$suffixLen)) === static::COUNT_SUFFIX) {
+            $methodName = \substr($methodName, 0, -$suffixLen);
+            $result['modifiers'][static::COUNT_SUFFIX] = 1;
+        }
+
+        if (!$methodName) {
+            throw new \UnexpectedValueException(sprintf(
+                'Method name "%s" becomes empty after removing "%s" suffix',
+                $originalMethodName,
+                static::COUNT_SUFFIX
+            ));
+        }
+
+        $result['alias'] = $methodName;
+
+        return $result;
     }
-
-    protected function extractModifiers(string $method_name)
-    {
-        // TODO
-
-    }
-
 
     /**
      * Получаем набор возможных алиасов, по которым можно найти аксессор.
@@ -93,15 +135,18 @@ class IBEFacade
      *  - `popular-articles` (kebab case)
      *  - `PopularArticles`
      *
-     * @param $method_name
+     * Из названия метода вида `getpopulararticles` выйдет
+     * меньше вариантов алиасов, так что именуйте правильно.
      *
+     * @param string $alias
      * @return array
+     * @internal param $method_name
+     *
      */
-    protected static function getAccessorAliases(string $method_name): array
+    protected static function getAccessorAliases(string $alias): array
     {
         $aliases = [];
 
-        $alias = \substr($method_name, \strlen(static::METHOD_PREFIX));
         $aliases[$alias] = 1;
 
         $alias = \strtolower($alias[0]) . \substr($alias, 1);
@@ -136,7 +181,7 @@ class IBEFacade
                 break;
             }
         }
-        
+
         if (!$alias) {
             $alias = self::resolveAccessorFromAliases($possibleAliases);
         }
@@ -154,9 +199,10 @@ class IBEFacade
      *
      * @throws \UnexpectedValueException
      */
-    public static function registerAccessor(string $alias, int $source_id): void
+    public static function registerAccessor(string $alias, int $source_id)
     {
         $alias = trim($alias);
+
         if ($alias) {
             self::$accessors[trim($alias)] = new IBEAccessor($source_id);
         } else {
