@@ -14,11 +14,10 @@ class IBEFacade
     protected static $accessors = [];
     
     /** @var SourceFinder */
-    protected static $source_finder;
+    protected static $sourceFinder;
 
-    private function __construct() {}
-    private function __sleep() {}
-    private function __wakeup() {}
+    /** @var string */
+    protected static $siteId = '';
 
     /**
      * Методы получения записей начинаются с префикса `get` (`getArticles`, `getNews` и т.д)
@@ -140,8 +139,6 @@ class IBEFacade
      *
      * @param string $alias
      * @return array
-     * @internal param $method_name
-     *
      */
     protected static function getAccessorAliases(string $alias): array
     {
@@ -192,7 +189,8 @@ class IBEFacade
     /**
      * Регистрируем новый аксессор под указанным алиасом.
      * Проверка уществования источника данных с указанным id НЕ производится.
-     * // TODO 1 - add argument `bool $check_existence` and check whether iblock with such id exists (SITE_ID which?)
+     * // TODO 1 - add argument `bool $check_existence` and check
+     * // whether iblock with such id exists (SITE_ID which?)
      *
      * @param $alias
      * @param $source_id
@@ -222,12 +220,12 @@ class IBEFacade
      */
     protected static function resolveAccessorFromAliases(array $possibleAliases): string
     {
-        if (!self::$source_finder) {
-            self::$source_finder = new SourceFinder();
+        if (!self::$sourceFinder) {
+            self::$sourceFinder = new SourceFinder();
         }
         
         foreach ($possibleAliases as $alias) {
-            $source = self::$source_finder->findByCode($alias);
+            $source = self::$sourceFinder->findByCode($alias, self::$siteId);
             if ($source) {
                 self::registerAccessor($alias, $source['ID']);
                 return $alias;
@@ -270,5 +268,13 @@ class IBEFacade
             },
             $source
         );
+    }
+
+    /**
+     * @param string $siteId
+     */
+    public static function setSiteId(string $siteId): void
+    {
+        self::$siteId = substr(trim($siteId), 0, 2);
     }
 }
